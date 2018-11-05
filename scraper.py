@@ -1,27 +1,40 @@
 import requests
+import re
 from bs4 import BeautifulSoup
 from user_agent import generate_user_agent
 
 headers = {'User-Agent': generate_user_agent(device_type="desktop", os=('mac', 'linux'))}
-
-# zsg-photo-card-price
-# zsg-photo-card-info
-
 site = requests.get('https://www.zillow.com/santa-cruz-ca/', timeout=5, headers=headers)
+
+def sanitize(str):
+  return float(re.sub('[,$]', '', str))
 
 if site.status_code is 200:
   content = BeautifulSoup(site.content, 'html.parser')
-  
   prices = content.find_all(class_='zsg-photo-card-price')
-  #comes back in form
-  # <span class="zsg-photo-card-price">$949,000</span>
-  
   info = content.find_all(class_='zsg-photo-card-info');
-  # comes back in form 
-  # <span class="zsg-photo-card-info">5 bds <span class="interpunct">·</span> 4 ba <span class="interpunct">·</span> 3,012 sqft</span>
 
-  
+  homePrices = [];
+  homeStats = [];
+
   for price in prices :
-    print(price);
+    homePrice = sanitize(price.get_text())
+    homePrices.append(homePrice)
   for i in info:
-    print(i);
+    i = i.get_text().split(' · ');
+    beds = 1.0 if i[0] in ('Studio', '1 bd') else sanitize(i[0].split(' bds')[0]);
+    baths = sanitize(i[1].split(' ba')[0]);
+    sqft = sanitize(i[2].split(' sqft')[0]);
+    # homeStats.append({'beds': beds, 'baths': baths, 'sqft': sqft});
+    homeStats.append([beds, baths, sqft])
+  
+  
+  result = [[x] + homeStats[i] for i,x in enumerate(homePrices)]
+  
+  for r in result:
+    print(r)
+else:
+  print(site.status_code)
+  # ranked_users = ['jon','bob','jane','alice','chris']
+  # user_details = [{'name' : x, 'rank' : ranked_users.index(x)} for x in ranked_users]
+
